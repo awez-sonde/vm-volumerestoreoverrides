@@ -54,6 +54,28 @@ You are **not** running everything in one Application. There are **three demo Ap
 
 Each app points at **one** overlay folder and **one** root file. They do not share a single sync that does VM + snapshot + restore together.
 
+## File-on-disk restore demo (delete VM → new VM → restore)
+
+Automated script (run on cluster with `oc` logged in):
+
+```bash
+chmod +x gitops/scripts/file-restore-demo.sh
+./gitops/scripts/file-restore-demo.sh
+```
+
+**Why this often fails if done manually**
+
+| Mistake | What goes wrong |
+|---------|------------------|
+| Argo **selfHeal** on `fedora-demo-vm` | VM is recreated **before** you restore, or fights your delete |
+| Restore while VM is **running** | Restore fails or does not replace the disk |
+| Old **`VirtualMachineRestore`** left in place | Re-sync does nothing; delete CR first |
+| Old **PVC/DV** `fedora-demo-rootdisk` not deleted | New VM uses wrong disk; delete VM **and** its PVC |
+| Checking file **before VM is booted** | SSH refused; wait ~30s after start |
+| `fedora-demo-disk-from-snap` PVC **Pending** right after restore | Normal until VM starts (`WaitForFirstConsumer`) |
+
+Correct order: **file → snapshot → delete VM + root PVC → sync VM → halt → delete restore CR → sync restore → start VM → verify file**.
+
 ## Commands per step
 
 ```bash
