@@ -17,6 +17,7 @@ spec:
     path: gitops/overlays/vm-volume-restore-demo/vm
   destination:
     server: https://kubernetes.default.svc
+    namespace: vm-volume-restore-demo
   syncPolicy:
     automated:
       prune: false

@@ -1,0 +1,5 @@
+# Append these lines to Argo CD RBAC if the UI shows no applications.
+# OpenShift GitOps default policy only grants cluster-admins the admin role.
+g, system:cluster-admins, role:admin
+g, cluster-admins, role:admin
+g, admin, role:admin
