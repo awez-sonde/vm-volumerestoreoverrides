@@ -14,9 +14,9 @@ spec:
   source:
     repoURL: https://github.com/awez-sonde/vm-volumerestoreoverrides.git
     targetRevision: main
-    path: .
-    directory:
-      include: snapshot.yaml
+    path: gitops/overlays/vm-volume-restore-demo/snapshot
+    kustomize:
+      buildOptions: --load-restrictor LoadRestrictionsNone
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:

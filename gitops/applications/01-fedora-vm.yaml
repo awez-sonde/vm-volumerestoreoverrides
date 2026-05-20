@@ -14,9 +14,9 @@ spec:
   source:
     repoURL: https://github.com/awez-sonde/vm-volumerestoreoverrides.git
     targetRevision: main
-    path: .
-    directory:
-      include: fedora-demo-vm.yaml
+    path: gitops/overlays/vm-volume-restore-demo/vm
+    kustomize:
+      buildOptions: --load-restrictor LoadRestrictionsNone
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
@@ -29,6 +29,6 @@ spec:
     - group: kubevirt.io
       kind: VirtualMachine
       name: fedora-demo
-      namespace: vm-demo
+      namespace: vm-volume-restore-demo
       jsonPointers:
         - /spec/runStrategy

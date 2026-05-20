@@ -1,88 +1,88 @@
 # OpenShift GitOps — volumeRestoreOverrides demo
 
-This folder registers **Argo CD Applications** (OpenShift GitOps) that deploy the same manifests at the repo root (`fedora-demo-vm.yaml`, `snapshot.yaml`, `restore-with-overrides.yaml`) on your cluster.
+This folder deploys the **same manifests** at the repo root (`fedora-demo-vm.yaml`, `snapshot.yaml`, `restore-with-overrides.yaml`) into a **separate namespace** from the manual `oc apply` demo.
 
-Applications are split by demo phase so you can sync them in order, matching the manual procedure in the [root README](../README.md).
+| Manual demo (`oc apply`) | GitOps demo (this folder) |
+|--------------------------|---------------------------|
+| Namespace `vm-demo` | Namespace `vm-volume-restore-demo` |
+| Root YAML as-is | Kustomize overlays rewrite namespace only |
+
+Both can run on the same cluster without conflicting.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `appproject.yaml` | Argo CD `AppProject` scoped to `vm-demo` |
-| `applications/01-fedora-vm.yaml` | Namespace + VM (auto-sync) |
-| `applications/02-fedora-snapshot.yaml` | `VirtualMachineSnapshot` (sync when VM is ready) |
-| `applications/03-fedora-restore.yaml` | `VirtualMachineRestore` with `volumeRestoreOverrides` (sync after halt) |
-| `bootstrap/root-application.yaml` | App-of-apps: installs project + child applications |
+| `overlays/vm-volume-restore-demo/component/` | Shared namespace transform (`vm-demo` → `vm-volume-restore-demo`) |
+| `overlays/vm-volume-restore-demo/vm/` | Kustomize overlay pointing at `fedora-demo-vm.yaml` |
+| `overlays/vm-volume-restore-demo/snapshot/` | Kustomize overlay pointing at `snapshot.yaml` |
+| `overlays/vm-volume-restore-demo/restore/` | Kustomize overlay pointing at `restore-with-overrides.yaml` |
+| `appproject.yaml` | Argo CD `AppProject` scoped to `vm-volume-restore-demo` |
+| `applications/*.yaml` | Phase Applications (VM / snapshot / restore) |
+| `bootstrap/root-application.yaml` | App-of-apps bootstrap |
 
 ## Prerequisites
 
-- OpenShift cluster with **OpenShift GitOps** (Argo CD) installed
-- OpenShift Virtualization and a CSI class that supports snapshots (same as root README)
-- `cluster-admin` or permission to create `Application` / `AppProject` in `openshift-gitops`
-- Git access from the cluster to this repository (public URL, or configure repo credentials in Argo CD)
+- OpenShift cluster with **OpenShift GitOps** and **OpenShift Virtualization**
+- CSI storage class supporting VolumeSnapshots (same as root README)
+- Git access from the cluster to this repository
 
 ## 1. Register the demo (one-time)
-
-Point Argo CD at this repo. If you use a fork or another branch, edit `repoURL` / `targetRevision` in the YAML files under `gitops/` first.
 
 ```bash
 oc apply -f gitops/bootstrap/root-application.yaml
 ```
 
-That creates:
-
-- AppProject `vm-volume-restore-demo`
-- Applications `fedora-demo-vm`, `fedora-demo-snapshot`, `fedora-demo-restore`
-
-Confirm in the Argo CD UI (**OpenShift GitOps → GitOps → Cluster Argo CD → Open Argo CD UI**) or:
-
 ```bash
 oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=volume-restore-overrides-demo
 ```
 
-## 2. Demo flow via GitOps
+## 2. Demo flow (namespace `vm-volume-restore-demo`)
 
 | Step | Action | GitOps |
 |------|--------|--------|
-| 1 | Deploy VM | `fedora-demo-vm` syncs automatically (or **Sync** in UI) |
-| 2 | Wait for VM Ready | `oc wait vm/fedora-demo -n vm-demo --for=condition=Ready --timeout=300s` |
-| 3 | Verify original page | See root README |
-| 4 | Take snapshot | **Sync** `fedora-demo-snapshot` (not auto-sync) |
-| 5 | Wait snapshot ready | `oc wait virtualmachinesnapshot/fedora-demo-snap -n vm-demo --for=jsonpath='{.status.readyToUse}'=true --timeout=120s` |
-| 6 | Modify page / verify drift | Manual steps in root README |
-| 7 | Halt VM | `oc patch vm fedora-demo -n vm-demo --type merge -p '{"spec":{"runStrategy":"Halted"}}'` |
+| 1 | Deploy VM | `fedora-demo-vm` auto-syncs (creates namespace + VM) |
+| 2 | Wait for VM Ready | `oc wait vm/fedora-demo -n vm-volume-restore-demo --for=condition=Ready --timeout=300s` |
+| 3 | Verify original page | Use `vm-volume-restore-demo` in curl/ssh steps from [root README](../README.md) |
+| 4 | Take snapshot | **Sync** `fedora-demo-snapshot` |
+| 5 | Wait snapshot ready | `oc wait virtualmachinesnapshot/fedora-demo-snap -n vm-volume-restore-demo --for=jsonpath='{.status.readyToUse}'=true --timeout=120s` |
+| 6 | Modify page / verify drift | Same as root README, replace `-n vm-demo` with `-n vm-volume-restore-demo` |
+| 7 | Halt VM | `oc patch vm fedora-demo -n vm-volume-restore-demo --type merge -p '{"spec":{"runStrategy":"Halted"}}'` |
 | 8 | Restore with overrides | **Sync** `fedora-demo-restore` |
-| 9 | Start VM & verify | Root README steps 9–10 |
-
-CLI sync examples:
+| 9 | Start VM & verify | `oc patch vm fedora-demo -n vm-volume-restore-demo --type merge -p '{"spec":{"runStrategy":"Always"}}'` then curl test |
 
 ```bash
 argocd app sync fedora-demo-snapshot -n openshift-gitops
 argocd app sync fedora-demo-restore -n openshift-gitops
 ```
 
-Or from the OpenShift console: **Sync** on the corresponding Application.
+Do not sync `fedora-demo-restore` until the VM is halted and the snapshot is `readyToUse`.
 
-**Important:** Do not sync `fedora-demo-restore` until the VM is halted and the snapshot is `readyToUse`. The restore Application is intentionally **not** auto-synced.
+## 3. Change the target namespace
 
-## 3. Repo URL / branch overrides
+Edit `gitops/overlays/vm-volume-restore-demo/component/kustomization.yaml`:
 
-If this code lives in a different remote or branch, update `repoURL` and `targetRevision` in:
+- `namespace:` field
+- Namespace patch `value` (must match)
 
-- `gitops/bootstrap/root-application.yaml`
-- `gitops/applications/*.yaml`
-- `gitops/appproject.yaml` (`sourceRepos` allow-list)
+Update `gitops/appproject.yaml` destinations and `ignoreDifferences` namespace in `applications/01-fedora-vm.yaml`.
 
-## 4. Teardown
+## 4. Repo URL / branch
+
+Update `repoURL` and `targetRevision` in `bootstrap/`, `applications/`, and `appproject.yaml` if not using the default GitHub remote.
+
+## 5. Teardown (GitOps namespace only)
 
 ```bash
 oc delete application volume-restore-overrides-demo fedora-demo-vm fedora-demo-snapshot fedora-demo-restore -n openshift-gitops --ignore-not-found
 oc delete appproject vm-volume-restore-demo -n openshift-gitops --ignore-not-found
-oc delete -f restore-with-overrides.yaml -f snapshot.yaml -f fedora-demo-vm.yaml --ignore-not-found
+oc delete namespace vm-volume-restore-demo --ignore-not-found
 ```
+
+The manual demo in `vm-demo` is untouched.
 
 ## Design notes
 
-- **Same files as `oc apply`:** Child apps use `directory.include` so Argo deploys only the matching root manifest; nothing is duplicated under `gitops/`.
-- **VM runStrategy:** `fedora-demo-vm` ignores drift on `spec.runStrategy` so halting the VM for restore does not show OutOfSync for that field.
-- **Auto-sync:** Only the VM app auto-syncs; snapshot and restore are manual to preserve the demo sequence.
+- **Same VM/snapshot/restore specs:** Overlays reference the root YAML files; Kustomize only rewrites `vm-demo` → `vm-volume-restore-demo`. Argo CD uses `buildOptions: --load-restrictor LoadRestrictionsNone` so Kustomize can read manifests outside the overlay folder.
+- **Namespace isolation:** GitOps workload lives in `vm-volume-restore-demo`; original files still document `vm-demo` for `oc apply`.
+- **VM runStrategy:** `fedora-demo-vm` ignores `spec.runStrategy` drift after you halt the VM for restore.
