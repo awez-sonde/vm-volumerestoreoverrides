@@ -57,11 +57,21 @@ wait_vm_ready() {
 ssh_vm() {
   local cmd="$1"
   local ip
+  local attempt
   ip=$(oc get vmi fedora-demo -n "$NS" -o jsonpath='{.status.interfaces[0].ipAddress}')
-  oc run "ssh-$(date +%s)" --rm -i --restart=Never -n "$NS" \
-    --image=quay.io/fedora/fedora:40 -- /bin/bash -c \
-    "dnf install -y -q sshpass openssh-clients 2>/dev/null && \
-     sshpass -p 'redhat123' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=15 fedora@${ip} '${cmd}'"
+  echo "SSH to fedora@${ip} (sshd may take 30-90s after VMI Ready)..."
+  for attempt in $(seq 1 12); do
+    if oc run "ssh-$(date +%s)" --rm -i --restart=Never -n "$NS" \
+      --image=quay.io/fedora/fedora:40 -- /bin/bash -c \
+      "dnf install -y -q sshpass openssh-clients 2>/dev/null && \
+       sshpass -p 'redhat123' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 fedora@${ip} '${cmd}'"; then
+      return 0
+    fi
+    echo "SSH attempt ${attempt}/12 failed (connection refused or not ready); retrying in 15s..."
+    sleep 15
+  done
+  echo "ERROR: SSH failed after 12 attempts"
+  exit 1
 }
 
 # Stop Argo from recreating the VM while it is deleted (common failure mode)
@@ -117,7 +127,6 @@ oc get pvc fedora-demo-disk-from-snap -n "$NS"
 log "STEP 5: Start VM and verify file"
 oc patch vm fedora-demo -n "$NS" --type merge -p '{"spec":{"runStrategy":"Always"}}'
 wait_vm_ready
-sleep 25
 ssh_vm "cat ${TESTFILE}"
 
 log "SUCCESS: file restored from snapshot"
