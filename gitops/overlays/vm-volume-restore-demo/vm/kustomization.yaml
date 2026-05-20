@@ -1,6 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-components:
-  - ../component
+namespace: vm-volume-restore-demo
 resources:
-  - ../../../../fedora-demo-vm.yaml
+  - fedora-demo-vm.yaml
+patches:
+  - target:
+      kind: Namespace
+      name: vm-demo
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: vm-volume-restore-demo

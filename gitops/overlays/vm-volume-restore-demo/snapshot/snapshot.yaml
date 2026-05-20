@@ -1,0 +1,11 @@
+---
+apiVersion: snapshot.kubevirt.io/v1beta1
+kind: VirtualMachineSnapshot
+metadata:
+  name: fedora-demo-snap
+  namespace: vm-demo
+spec:
+  source:
+    apiGroup: kubevirt.io
+    kind: VirtualMachine
+    name: fedora-demo

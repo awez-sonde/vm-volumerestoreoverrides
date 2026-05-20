@@ -1,0 +1,20 @@
+---
+apiVersion: snapshot.kubevirt.io/v1beta1
+kind: VirtualMachineRestore
+metadata:
+  name: fedora-demo-restore
+  namespace: vm-demo
+spec:
+  target:
+    apiGroup: kubevirt.io
+    kind: VirtualMachine
+    name: fedora-demo
+  virtualMachineSnapshotName: fedora-demo-snap
+  volumeRestoreOverrides:
+    - volumeName: rootdisk
+      restoreName: fedora-demo-disk-from-snap
+      labels:
+        restore-test: "true"
+        snapshot-origin: "fedora-demo-snap"
+      annotations:
+        description: "Restored from snapshot fedora-demo-snap using volumeRestoreOverrides"

@@ -13,10 +13,10 @@ Both can run on the same cluster without conflicting.
 
 | Path | Purpose |
 |------|---------|
-| `overlays/vm-volume-restore-demo/component/` | Shared namespace transform (`vm-demo` → `vm-volume-restore-demo`) |
-| `overlays/vm-volume-restore-demo/vm/` | Kustomize overlay pointing at `fedora-demo-vm.yaml` |
-| `overlays/vm-volume-restore-demo/snapshot/` | Kustomize overlay pointing at `snapshot.yaml` |
-| `overlays/vm-volume-restore-demo/restore/` | Kustomize overlay pointing at `restore-with-overrides.yaml` |
+| `overlays/vm-volume-restore-demo/vm/` | Copy of `fedora-demo-vm.yaml` + Kustomize namespace rewrite |
+| `overlays/vm-volume-restore-demo/snapshot/` | Copy of `snapshot.yaml` + namespace rewrite |
+| `overlays/vm-volume-restore-demo/restore/` | Copy of `restore-with-overrides.yaml` + namespace rewrite |
+| `scripts/sync-manifests.sh` | Re-copy root manifests into overlays after you edit them |
 | `appproject.yaml` | Argo CD `AppProject` scoped to `vm-volume-restore-demo` |
 | `applications/*.yaml` | Phase Applications (VM / snapshot / restore) |
 | `bootstrap/root-application.yaml` | App-of-apps bootstrap |
@@ -83,6 +83,6 @@ The manual demo in `vm-demo` is untouched.
 
 ## Design notes
 
-- **Same VM/snapshot/restore specs:** Overlays reference the root YAML files; Kustomize only rewrites `vm-demo` → `vm-volume-restore-demo`. Argo CD uses `buildOptions: --load-restrictor LoadRestrictionsNone` so Kustomize can read manifests outside the overlay folder.
+- **Same VM/snapshot/restore specs:** Each overlay folder holds a copy of the root YAML (Argo Kustomize cannot read files outside the overlay path). After editing root manifests, run `gitops/scripts/sync-manifests.sh`.
 - **Namespace isolation:** GitOps workload lives in `vm-volume-restore-demo`; original files still document `vm-demo` for `oc apply`.
 - **VM runStrategy:** `fedora-demo-vm` ignores `spec.runStrategy` drift after you halt the VM for restore.

@@ -1,0 +1,76 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vm-demo
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: fedora-demo
+  namespace: vm-demo
+  labels:
+    app: fedora-demo
+spec:
+  runStrategy: Always
+  dataVolumeTemplates:
+    - metadata:
+        name: fedora-demo-rootdisk
+      spec:
+        source:
+          registry:
+            url: docker://quay.io/containerdisks/fedora:40
+        storage:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+          storageClassName: ocs-external-storagecluster-ceph-rbd
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: fedora-demo
+        app: fedora-demo
+    spec:
+      domain:
+        cpu:
+          cores: 1
+        devices:
+          disks:
+            - disk:
+                bus: virtio
+              name: rootdisk
+            - disk:
+                bus: virtio
+              name: cloudinitdisk
+          interfaces:
+            - masquerade: {}
+              name: default
+        memory:
+          guest: 2Gi
+        resources:
+          requests:
+            memory: 2Gi
+      networks:
+        - name: default
+          pod: {}
+      volumes:
+        - dataVolume:
+            name: fedora-demo-rootdisk
+          name: rootdisk
+        - cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              user: fedora
+              password: redhat123
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+              packages:
+                - httpd
+              runcmd:
+                - systemctl enable httpd
+                - systemctl start httpd
+                - echo '<html><body><h1>Original Page - Snapshot Demo</h1><p>This is the ORIGINAL page before snapshot restore.</p></body></html>' > /var/www/html/index.html
+          name: cloudinitdisk
