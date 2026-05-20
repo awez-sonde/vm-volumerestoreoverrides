@@ -9,6 +9,19 @@ This folder deploys the **same manifests** at the repo root (`fedora-demo-vm.yam
 
 Both can run on the same cluster without conflicting.
 
+## How the demo flow works
+
+**You already have three separate Applications** (VM, snapshot, restore). They do **not** all run in one sync.
+
+| Step | What you do | Argo CD Application |
+|------|-------------|---------------------|
+| 1 | Create VM | `fedora-demo-vm` — **Sync** when ready |
+| 2 | Create snapshot | `fedora-demo-snapshot` — **Sync** when VM is Ready |
+| 3 | Add drift to the VM | **Manual** (`oc` / SSH) — no Application |
+| 4 | Restore VM | `fedora-demo-restore` — **Sync** after halt + snapshot ready |
+
+A fourth app, `volume-restore-overrides-demo`, is only the **installer** (registers the three apps). See **[DEMO-FLOW.md](DEMO-FLOW.md)** for a diagram and commands.
+
 ## Layout
 
 | Path | Purpose |
@@ -68,33 +81,18 @@ oc get applications -n openshift-gitops -l app.kubernetes.io/part-of=volume-rest
 
 ## 2. Demo flow (namespace `vm-volume-restore-demo`)
 
-| Step | Action | GitOps |
-|------|--------|--------|
-| 1 | Deploy VM | `fedora-demo-vm` auto-syncs (creates namespace + VM) |
-| 2 | Wait for VM Ready | `oc wait vm/fedora-demo -n vm-volume-restore-demo --for=condition=Ready --timeout=300s` |
-| 3 | Verify original page | Use `vm-volume-restore-demo` in curl/ssh steps from [root README](../README.md) |
-| 4 | Take snapshot | **Sync** `fedora-demo-snapshot` |
-| 5 | Wait snapshot ready | `oc wait virtualmachinesnapshot/fedora-demo-snap -n vm-volume-restore-demo --for=jsonpath='{.status.readyToUse}'=true --timeout=120s` |
-| 6 | Modify page / verify drift | Same as root README, replace `-n vm-demo` with `-n vm-volume-restore-demo` |
-| 7 | Halt VM | `oc patch vm fedora-demo -n vm-volume-restore-demo --type merge -p '{"spec":{"runStrategy":"Halted"}}'` |
-| 8 | Restore with overrides | **Sync** `fedora-demo-restore` |
-| 9 | Start VM & verify | `oc patch vm fedora-demo -n vm-volume-restore-demo --type merge -p '{"spec":{"runStrategy":"Always"}}'` then curl test |
+Follow **[DEMO-FLOW.md](DEMO-FLOW.md)**. Short version:
 
-```bash
-argocd app sync fedora-demo-snapshot -n openshift-gitops
-argocd app sync fedora-demo-restore -n openshift-gitops
-```
+1. **Sync** `fedora-demo-vm` → wait for VM Ready  
+2. **Sync** `fedora-demo-snapshot` → wait for snapshot `readyToUse`  
+3. **Manual drift** → change web page (root README, use `-n vm-volume-restore-demo`)  
+4. Halt VM → **Sync** `fedora-demo-restore` → start VM and verify page
 
-Do not sync `fedora-demo-restore` until the VM is halted and the snapshot is `readyToUse`.
+None of the three workload apps auto-sync; you choose when each step runs in the Argo CD UI.
 
 ## 3. Change the target namespace
 
-Edit `gitops/overlays/vm-volume-restore-demo/component/kustomization.yaml`:
-
-- `namespace:` field
-- Namespace patch `value` (must match)
-
-Update `gitops/appproject.yaml` destinations and `ignoreDifferences` namespace in `applications/01-fedora-vm.yaml`.
+Edit namespace in each overlay `kustomization.yaml` under `gitops/overlays/vm-volume-restore-demo/`, then update `gitops/appproject.yaml` destinations and `applications/01-fedora-vm.yaml` `ignoreDifferences` namespace.
 
 ## 4. Repo URL / branch
 
@@ -114,4 +112,5 @@ The manual demo in `vm-demo` is untouched.
 
 - **Same VM/snapshot/restore specs:** Each overlay folder holds a copy of the root YAML (Argo Kustomize cannot read files outside the overlay path). After editing root manifests, run `gitops/scripts/sync-manifests.sh`.
 - **Namespace isolation:** GitOps workload lives in `vm-volume-restore-demo`; original files still document `vm-demo` for `oc apply`.
+- **Manual sync per step:** VM, snapshot, and restore each have their own Application; sync only when that step should run.
 - **VM runStrategy:** `fedora-demo-vm` ignores `spec.runStrategy` drift after you halt the VM for restore.

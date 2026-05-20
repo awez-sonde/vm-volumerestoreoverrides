@@ -19,9 +19,6 @@ spec:
     server: https://kubernetes.default.svc
     namespace: vm-volume-restore-demo
   syncPolicy:
-    automated:
-      prune: false
-      selfHeal: true
     syncOptions:
       - RespectIgnoreDifferences=true
   ignoreDifferences:
