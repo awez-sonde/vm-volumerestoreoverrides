@@ -1,0 +1,34 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fedora-demo-vm
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: volume-restore-overrides-demo
+    demo.phase: vm
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: vm-volume-restore-demo
+  source:
+    repoURL: https://github.com/awez-sonde/vm-volumerestoreoverrides.git
+    targetRevision: main
+    path: .
+    directory:
+      include: fedora-demo-vm.yaml
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: kubevirt.io
+      kind: VirtualMachine
+      name: fedora-demo
+      namespace: vm-demo
+      jsonPointers:
+        - /spec/runStrategy

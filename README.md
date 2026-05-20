@@ -16,6 +16,7 @@ to restore a VM from a snapshot.
 | `fedora-demo-vm.yaml` | VM with DataVolume, cloud-init (httpd + demo page) |
 | `snapshot.yaml` | VirtualMachineSnapshot definition |
 | `restore-with-overrides.yaml` | VirtualMachineRestore with `volumeRestoreOverrides` |
+| `gitops/` | OpenShift GitOps (Argo CD) Applications for the same manifests — see [gitops/README.md](gitops/README.md) |
 
 ## Step-by-Step Test Procedure
 

@@ -1,0 +1,24 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: vm-volume-restore-demo
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  description: OpenShift Virtualization volumeRestoreOverrides demo
+  sourceRepos:
+    - https://github.com/awez-sonde/vm-volumerestoreoverrides.git
+    - '*'
+  destinations:
+    - namespace: vm-demo
+      server: https://kubernetes.default.svc
+    - namespace: openshift-gitops
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

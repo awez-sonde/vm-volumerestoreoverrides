@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: volume-restore-overrides-demo
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/part-of: volume-restore-overrides-demo
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/awez-sonde/vm-volumerestoreoverrides.git
+    targetRevision: main
+    path: gitops
+    directory:
+      recurse: true
+      exclude: bootstrap/**
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
