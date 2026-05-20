@@ -21,6 +21,35 @@ Both can run on the same cluster without conflicting.
 | `applications/*.yaml` | Phase Applications (VM / snapshot / restore) |
 | `bootstrap/root-application.yaml` | App-of-apps bootstrap |
 
+## Troubleshooting
+
+### Empty Argo CD UI (no applications listed)
+
+OpenShift GitOps RBAC only grants the **admin** role to OpenShift `cluster-admins` by default. Log in with the local Argo CD user **`admin`** (not only OpenShift SSO), or add your user/group to the Argo CD policy:
+
+```bash
+oc patch argocd openshift-gitops -n openshift-gitops --type merge -p \
+  '{"spec":{"rbac":{"policy":"g, system:cluster-admins, role:admin\ng, cluster-admins, role:admin\ng, admin, role:admin\n"}}}'
+```
+
+Password:
+
+```bash
+oc get secret openshift-gitops-cluster -n openshift-gitops \
+  -o jsonpath='{.data.admin\.password}' | base64 -d; echo
+```
+
+Confirm CRs exist (CLI): `oc get applications.argoproj.io -n openshift-gitops`
+
+### Child apps `Unknown` / `InvalidSpecError` on destination
+
+The AppProject must allow the Application destination namespace. Child apps must set:
+
+```yaml
+destination:
+  namespace: vm-volume-restore-demo
+```
+
 ## Prerequisites
 
 - OpenShift cluster with **OpenShift GitOps** and **OpenShift Virtualization**
